@@ -8,6 +8,7 @@ Trabajos realizados en Ansible durante el taller
 
 -Inventario
 -Playbooks 
+-Files
 
 
 ##Instalacion 
