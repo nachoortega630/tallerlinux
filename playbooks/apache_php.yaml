@@ -15,6 +15,7 @@
         name:
           - php
           - php-fpm
+          - php-mysqlnd
         state: present
 
     - name: Instalar Firewalld
