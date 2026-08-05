@@ -1,3 +1,62 @@
 ---
-name: Instalacion de Apache y PHP
-hosts: centos
+- name: Instalacion de Apache y PHP
+  hosts: centos
+  become: yes
+
+  tasks:
+
+    - name: Instalar Apache
+      ansible.builtin.dnf:
+        name: httpd
+        state: present
+
+    - name: Instalar PHP y PHP-FPM
+      ansible.builtin.dnf:
+        name:
+          - php
+          - php-fpm
+        state: present
+
+    - name: Instalar Firewalld
+      ansible.builtin.dnf:
+        name: firewalld
+        state: present
+
+    - name: Habilitar e iniciar Apache
+      ansible.builtin.service:
+        name: httpd
+        state: started
+        enabled: true
+
+    - name: Habilitar e iniciar PHP-FPM
+      ansible.builtin.service:
+        name: php-fpm
+        state: started
+        enabled: true
+
+    - name: Habilitar e iniciar Firewalld
+      ansible.builtin.service:
+        name: firewalld
+        state: started
+        enabled: true
+
+    - name: Permitir HTTP
+      ansible.posix.firewalld:
+        service: http
+        permanent: true
+        state: enabled
+        immediate: true
+
+    - name: Permitir HTTPS
+      ansible.posix.firewalld:
+        service: https
+        permanent: true
+        state: enabled
+        immediate: true
+
+    - name: Recargar Firewalld
+      ansible.builtin.service:
+        name: firewalld
+        state: reloaded
+            
+
