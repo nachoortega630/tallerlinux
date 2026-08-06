@@ -1,0 +1,65 @@
+---
+- name: Instalar Apache, PHP, PHP-FPM y firewalld
+  hosts: centos
+  become: true
+
+  vars_files:
+    - ../vars/database.yaml
+
+  tasks:
+
+    - name: Instalar Apache, PHP, PHP-FPM, PHP-MySQL y Firewalld
+      ansible.builtin.dnf:
+        name:
+          - httpd
+          - php
+          - php-fpm
+          - php-mysqlnd
+          - firewalld
+          - python3-libsemanage
+        state: present
+
+    - name: Habilitar e iniciar servicios
+      ansible.builtin.service:
+        name: "{{ item }}"
+        state: started
+        enabled: true
+      loop:
+        - httpd
+        - php-fpm
+        - firewalld
+
+    - name: Permitir servicios HTTP y HTTPS en firewalld
+      ansible.posix.firewalld:
+        service: "{{ item }}"
+        permanent: true
+        state: enabled
+        immediate: true
+      loop:
+        - http
+        - https
+
+    - name: Instalar aplicación PHP
+      ansible.builtin.template:
+        src: ../templates/cumple.j2
+        dest: /var/www/html/index.php
+        mode: "0644"
+        owner: apache
+        group: apache
+      notify: Reiniciar Apache
+
+    - name: Permitir conexiones de red desde Apache en SELinux
+      ansible.posix.seboolean:
+        name: "{{ item }}"
+        state: true
+        persistent: true
+      loop:
+        - httpd_can_network_connect
+        - httpd_can_network_connect_db
+
+  handlers:
+
+    - name: Reiniciar Apache
+      ansible.builtin.service:
+        name: httpd
+        state: restarted
