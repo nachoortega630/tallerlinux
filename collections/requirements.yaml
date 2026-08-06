@@ -1,4 +1,5 @@
 ---
 collections:
   - community.general
-  - ansible.posix  
+  - ansible.posix
+  - ansible.mysql  

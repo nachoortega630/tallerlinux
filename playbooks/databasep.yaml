@@ -1,38 +1,35 @@
 ---
-- name: Instalar, configurar y habilitar MariaDB
+- name: Instalar y configurar el servidor MariaDB
   hosts: ubuntu01
   become: true
 
+  vars_files:
+    - ../vars/database.yaml
+
   tasks:
 
-    - name: Actualizar caché e instalar Apache, PHP, MariaDB y PyMySQL
+    - name: Instalar MariaDB y dependencias de Python
       ansible.builtin.apt:
         name:
-          - php
-          - libapache2-mod-php
-          - php-mysql
-          - mariadb-client
           - mariadb-server
+          - mariadb-client
           - python3-pymysql
         state: present
         update_cache: true
 
-    - name: Habilitar e iniciar Apache y MariaDB
+    - name: Habilitar e iniciar MariaDB
       ansible.builtin.systemd_service:
-        name: "{{ item }}"
+        name: mariadb
         state: started
         enabled: true
-      loop:
-        - apache2
-        - mariadb
 
-    - name: Esperar que MariaDB esté disponible
+    - name: Esperar que MariaDB esté disponible por socket
       ansible.builtin.wait_for:
         path: /run/mysqld/mysqld.sock
         state: present
         timeout: 30
 
-    - name: Eliminar usuarios anónimos de MariaDB
+    - name: Eliminar usuarios anónimos
       ansible.mysql.mysql_user:
         name: ""
         host_all: true
@@ -45,8 +42,16 @@
         state: absent
         login_unix_socket: /run/mysqld/mysqld.sock
 
+   
+    - name: Configurar MariaDB para escuchar en todas las interfaces
+      ansible.builtin.lineinfile:
+        path: /etc/mysql/mariadb.conf.d/50-server.cnf
+        regexp: '^bind-address'
+        line: 'bind-address = 0.0.0.0'
+      notify: Reiniciar MariaDB
 
-     - name: Crear la base de datos
+
+    - name: Crear la base de datos
       ansible.mysql.mysql_db:
         name: "{{ DB_DBASE }}"
         state: present
@@ -54,12 +59,25 @@
         collation: utf8mb4_unicode_ci
         login_unix_socket: /run/mysqld/mysqld.sock
 
-    - name: Crear usuario y otorgar permiso SELECT
+    - name: Crear usuario para el servidor Apache y otorgar permisos
       ansible.mysql.mysql_user:
         name: "{{ DB_USER }}"
-        password: "{{ DB_PASS }}"
         host: "%"
+        password: "{{ DB_PASS }}"
         priv: "{{ DB_DBASE }}.*:SELECT"
         state: present
         login_unix_socket: /run/mysqld/mysqld.sock
-      no_log: true     
+     
+    - name: Permitir puerto 3306
+      community.general.ufw:
+        rule: allow
+        port: "3306"
+        proto: tcp
+
+
+  handlers:
+
+    - name: Reiniciar MariaDB
+      ansible.builtin.systemd_service:
+        name: mariadb
+        state: restarted
