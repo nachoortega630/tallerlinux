@@ -1,0 +1,65 @@
+---
+- name: Instalar, configurar y habilitar MariaDB
+  hosts: ubuntu01
+  become: true
+
+  tasks:
+
+    - name: Actualizar caché e instalar Apache, PHP, MariaDB y PyMySQL
+      ansible.builtin.apt:
+        name:
+          - php
+          - libapache2-mod-php
+          - php-mysql
+          - mariadb-client
+          - mariadb-server
+          - python3-pymysql
+        state: present
+        update_cache: true
+
+    - name: Habilitar e iniciar Apache y MariaDB
+      ansible.builtin.systemd_service:
+        name: "{{ item }}"
+        state: started
+        enabled: true
+      loop:
+        - apache2
+        - mariadb
+
+    - name: Esperar que MariaDB esté disponible
+      ansible.builtin.wait_for:
+        path: /run/mysqld/mysqld.sock
+        state: present
+        timeout: 30
+
+    - name: Eliminar usuarios anónimos de MariaDB
+      ansible.mysql.mysql_user:
+        name: ""
+        host_all: true
+        state: absent
+        login_unix_socket: /run/mysqld/mysqld.sock
+
+    - name: Eliminar la base de datos de prueba
+      ansible.mysql.mysql_db:
+        name: test
+        state: absent
+        login_unix_socket: /run/mysqld/mysqld.sock
+
+
+     - name: Crear la base de datos
+      ansible.mysql.mysql_db:
+        name: "{{ DB_DBASE }}"
+        state: present
+        encoding: utf8mb4
+        collation: utf8mb4_unicode_ci
+        login_unix_socket: /run/mysqld/mysqld.sock
+
+    - name: Crear usuario y otorgar permiso SELECT
+      ansible.mysql.mysql_user:
+        name: "{{ DB_USER }}"
+        password: "{{ DB_PASS }}"
+        host: "%"
+        priv: "{{ DB_DBASE }}.*:SELECT"
+        state: present
+        login_unix_socket: /run/mysqld/mysqld.sock
+      no_log: true     
